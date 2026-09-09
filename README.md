@@ -19,12 +19,14 @@ graph TD
         direction TB
         DC["🖥️ DC01: Windows Server 2022<br>AD DS, DNS, DHCP"]
         PC["💻 PC-HR-01: Windows 10<br>Klient / Pracownik"]
+        PCIT["💻 PC-IT-01: Windows 10<br>Cloud Endpoint / Intune"]
         
         DC <-->|"Zarządzanie / Sieć"| PC
     end
 
     subgraph Cloud ["☁️ Chmura Microsoft"]
         Entra["Entra ID / M365"]
+        Intune["Microsoft Intune (MDM)"]
     end
 
     subgraph BlueTeam ["🛡️ Detekcja i SecOps"]
@@ -33,6 +35,8 @@ graph TD
     end
 
     DC -.->|"Entra ID Connect"| Entra
+    Intune -.->|"Zarządzanie urządzeniem"| PCIT
+    PCIT -.->|"Entra ID Join"| Entra
     DC == "Zdalne skanowanie logów (RPC)" ==> PC
     DC ==>|"Webhook (JSON)"| Discord
     IDS -.-> DC
@@ -54,6 +58,8 @@ B("Etap II: Automatyzacja \n(PowerShell & GPO)")
 C("Etap III: Red & Blue Team \n(BadUSB & IDS)")
 -->
 D("Etap IV: ITSM & M365 \n(Jira, Wi-Fi)")
+-->
+E("Etap V: Modern Endpoint \n(Intune & MDM)")
 ```
 </details>
 
@@ -266,6 +272,52 @@ Udokumentowanie umiejętności wymaganych w codziennej pracy Młodszego Specjali
 
 ---
 
+<details>
+<summary><font size="5"><b>☁️ ETAP V: Modern Endpoint Management & Peryferia</b></font></summary>
+
+Przejście z tradycyjnego, lokalnego zarządzania stacjami roboczymi (On-Premise GPO) na nowoczesny model chmurowy (Cloud-Native / MDM) oraz automatyzacja zarządzania sprzętem peryferyjnym w oparciu o zasady inżynierii oprogramowania.
+
+**🎯 Cel** \
+Wpięcie stacji roboczej Windows 10 bezpośrednio do chmury, wdrożenie restrykcji bezpieczeństwa z poziomu Microsoft Intune oraz automatyczna instalacja drukarki sieciowej za pomocą skryptu PowerShell.
+
+**🛠️ Wykorzystane Technologie** \
+`Microsoft Intune (MDM)`, `Microsoft Entra ID`, `Windows 10`, `PowerShell (PrintManagement)`
+
+**🚀 Kluczowe wdrożenia**
+* **Rejestracja MDM i Cloud-Native Endpoint:** Wpięcie czystej stacji roboczej (`PC-IT-01`) bezpośrednio do usługi Microsoft Entra ID oraz aktywacja zarządzania mobilnego urządzeniem przez Microsoft Intune z poziomu zalogowanego konta pracownika IT (`knowak`).
+* **Hardening i Profile Konfiguracji:** Utworzenie w portalu Intune profilu w oparciu o *Settings Catalog*, który wymusza zasady bezpieczeństwa poprzez całkowitą blokadę dostępu do Panelu Sterowania oraz Ustawień dla zwykłych użytkowników.
+* **Automatyzacja Peryferiów (Map-NetworkPrinter.ps1):** Zaprojektowanie bezpiecznego skryptu PowerShell do instalacji i mapowania wirtualnej drukarki sieciowej (`Biuro_Drukarka_Glowna` na porcie TCP/IP `10.0.0.50`), wdrożonego do stacji roboczych przez chmurę Intune w kontekście konta systemowego (`NT AUTHORITY\SYSTEM`).
+* **Zasada Idempotentności:** Zaimplementowanie w skrypcie warunków sprawdzających (`Get-Printer`), które uniemożliwiają powielanie portów i sterowników przy wielokrotnych synchronizacjach Intune, zapobiegając błędom systemowym.
+
+<details>
+<summary><font size=4><b>📸 Proof of Work</b></font></summary>
+
+**1. Weryfikacja rejestracji MDM (Microsoft Intune)**
+> Potwierdzenie pomyślnego podłączenia stacji roboczej `PC-IT-01` do chmury firmowej, widoczny adres serwera zarządzającego Intune oraz poprawny status synchronizacji.
+
+<p align="center">
+  <img src="docs/intune_device_management.png" width="70%" title="Status zarządzania MDM w Windows" style="border: 1px solid #444; border-radius: 6px; vertical-align: top;">
+</p>
+
+**2. Test blokady bezpieczeństwa (Hardening)**
+> Próba uruchomienia Panelu Sterowania na stacji roboczej zakończona niepowodzeniem – system wyświetla komunikat o restrykcjach narzuconych przez administratora chmurowego.
+
+<p align="center">
+  <img src="docs/control_panel_blocked.png" width="90%" title="Blokada Panelu Sterowania przez Intune" style="border: 1px solid #444; border-radius: 6px; vertical-align: top;">
+</p>
+
+**3. Wdrożenie skryptu drukarki i weryfikacja w PowerShell**
+> Widok konsoli Intune z dodanym skryptem wdrożeniowym oraz pomyślny wynik polecenia `Get-Printer` na kliencie, potwierdzający poprawne zmapowanie drukarki sieciowej.
+
+<p align="center">
+  <img src="docs/powershell_printer_verified.png" width="90%" title="Weryfikacja drukarki w PowerShell" style="border: 1px solid #444; border-radius: 6px; vertical-align: top;">
+</p>
+
+</details>
+</details>
+
+---
+
 <details open>
 <summary><font size="5"><b>📊 Podsumowanie i Wnioski</b></font></summary>
 
@@ -275,5 +327,6 @@ Budowa projektu **Active-Directory-HelpDesk-HomeLab** od zera pozwoliła mi zroz
 * **Praktyczny Troubleshooting:** Doświadczyłem i rozwiązałem realne problemy środowiskowe: od limitu znaków w oknie "Uruchom" blokującego payloady, przez formatowanie kodowania UTF-8 psujące parsowanie JSON-ów, aż po blokady zapory Windows Firewall uniemożliwiające zdalny odczyt zdarzeń (RPC).
 * **Bezpieczeństwo Operacyjne (OPSEC):** Zrozumiałem na własnych błędach koncepcję wycieku sekretów. Zastosowałem  zmienne środowiskowe (`$env`), zachowując sterylną czystość repozytorium GitHub przy wdrażaniu kodu.
 * **Blue Teaming to nie tylko SIEM z pudełka:** Opracowanie własnego narzędzia z wykorzystaniem cmdletu `Get-WinEvent` pokazało mi, z jak ogromną ilością surowych danych (Event IDs, struktury SID) musi mierzyć się analityk bezpieczeństwa, by wygenerować przydatny biznesowo alert.
+* **Ewolucja do Modern Workplace:** Zrozumiałem, jak wygląda płynne przejście z klasycznego, lokalnego AD do zarządzania chmurowego. Przećwiczyłem pełen cykl życia pracownika: od obsługi ticketu w systemie Jira, przez przypisanie licencji w M365, aż po bezdotykową konfigurację stacji roboczej i wymuszanie polityk bezpieczeństwa za pomocą Microsoft Intune.
 
 </details>
